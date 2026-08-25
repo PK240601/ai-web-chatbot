@@ -23,6 +23,12 @@ def home():
     """
     return render_template("index.html")
 
+# Whitelist of authorized models to prevent parameter injection
+ALLOWED_MODELS = {
+    "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5-mini", "gpt-5-nano",
+    "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4o-mini", "o3-mini", "o4-mini"
+}
+
 # ---------------------------------------------------------------------------
 # ROUTE 2: API Endpoint to handle incoming user questions
 # ---------------------------------------------------------------------------
@@ -39,6 +45,10 @@ def ask():
     selected_model = data.get("model", "gpt-4o-mini").strip()
     if not selected_model:
         selected_model = "gpt-4o-mini"
+
+    # Validation: Reject request if the model is not on the whitelist
+    if selected_model not in ALLOWED_MODELS:
+        return jsonify({"error": f"Model '{selected_model}' is not authorized."}), 400
 
     # Retrieve conversation history list
     messages = data.get("messages", [])
