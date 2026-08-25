@@ -137,9 +137,17 @@
                 </div>
             </div>
             
-            <div class="text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full font-medium border border-emerald-500/20">
-                GPT-4o Mini
-            </div>
+            <select id="model-select" class="text-xs bg-slate-900/90 text-emerald-400 border border-emerald-500/20 rounded-full px-3 py-1.5 font-medium outline-none focus:ring-1 focus:ring-emerald-500 transition-all duration-200 cursor-pointer">
+                <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+                <option value="gpt-5.4-nano">gpt-5.4-nano</option>
+                <option value="gpt-5-mini">gpt-5-mini</option>
+                <option value="gpt-5-nano">gpt-5-nano</option>
+                <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+                <option value="gpt-4.1-nano">gpt-4.1-nano</option>
+                <option value="gpt-4o-mini" selected>gpt-4o-mini</option>
+                <option value="o3-mini">o3-mini</option>
+                <option value="o4-mini">o4-mini</option>
+            </select>
         </header>
 
         <!-- Scrollable Chat Messages Window -->
@@ -179,6 +187,7 @@
         const chatBox = document.getElementById("chat-box");
         const sendBtn = document.getElementById("send-btn");
         const statusText = document.getElementById("status-text");
+        const modelSelect = document.getElementById("model-select");
 
         // Custom renderer configurations for Marked
         marked.setOptions({
@@ -280,7 +289,10 @@
                 const response = await fetch("/ask", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ prompt: prompt })
+                    body: JSON.stringify({ 
+                        prompt: prompt,
+                        model: modelSelect.value
+                    })
                 });
 
                 const data = await response.json();

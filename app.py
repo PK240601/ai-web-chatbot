@@ -37,6 +37,12 @@ def ask():
     
     # Safely retrieve the 'prompt' value and strip whitespace
     user_prompt = data.get("prompt", "").strip()
+    selected_model = data.get("model", "gpt-4o-mini").strip()
+    if not selected_model:
+        selected_model = "gpt-4o-mini"
+
+    # Print log statement to verify selected model in terminal
+    print(f"\n[API REQUEST] Model: {selected_model} | Prompt: {user_prompt[:50]}...")
 
     # Guard clause: Return an HTTP 400 (Bad Request) if the input is empty
     if not user_prompt:
@@ -45,7 +51,7 @@ def ask():
     try:
         # Send the prompt to the OpenAI Chat Completions API
         response = client.chat.completions.create(
-            model="gpt-4o-mini",  # Fast and cost-effective model
+            model=selected_model,  # Dynamically selected model
             messages=[
                 {
                     "role": "system",
