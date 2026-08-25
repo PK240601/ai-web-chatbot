@@ -42,7 +42,7 @@ ai-web-chatbot/
 
 ### 2. Clone the Repository
 ```bash
-git clone https://github.com/<YOUR-GITHUB-USERNAME>/ai-web-chatbot.git
+git clone https://github.com/PK240601/ai-web-chatbot.git
 cd ai-web-chatbot
 ```
 
