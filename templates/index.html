@@ -140,17 +140,24 @@
                 </div>
             </div>
             
-            <select id="model-select" class="text-xs bg-slate-900/90 text-emerald-400 border border-emerald-500/20 rounded-full px-3 py-1.5 font-medium outline-none focus:ring-1 focus:ring-emerald-500 transition-all duration-200 cursor-pointer">
-                <option value="gpt-5.4-mini">gpt-5.4-mini</option>
-                <option value="gpt-5.4-nano">gpt-5.4-nano</option>
-                <option value="gpt-5-mini">gpt-5-mini</option>
-                <option value="gpt-5-nano">gpt-5-nano</option>
-                <option value="gpt-4.1-mini">gpt-4.1-mini</option>
-                <option value="gpt-4.1-nano">gpt-4.1-nano</option>
-                <option value="gpt-4o-mini" selected>gpt-4o-mini</option>
-                <option value="o3-mini">o3-mini</option>
-                <option value="o4-mini">o4-mini</option>
-            </select>
+            <div class="flex items-center gap-2">
+                <select id="model-select" class="text-xs bg-slate-900/90 text-emerald-400 border border-emerald-500/20 rounded-full px-3 py-1.5 font-medium outline-none focus:ring-1 focus:ring-emerald-500 transition-all duration-200 cursor-pointer">
+                    <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+                    <option value="gpt-5.4-nano">gpt-5.4-nano</option>
+                    <option value="gpt-5-mini">gpt-5-mini</option>
+                    <option value="gpt-5-nano">gpt-5-nano</option>
+                    <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+                    <option value="gpt-4.1-nano">gpt-4.1-nano</option>
+                    <option value="gpt-4o-mini" selected>gpt-4o-mini</option>
+                    <option value="o3-mini">o3-mini</option>
+                    <option value="o4-mini">o4-mini</option>
+                </select>
+                <button type="button" id="clear-btn" class="text-slate-400 hover:text-rose-400 p-1.5 rounded-lg hover:bg-white/5 transition duration-200 cursor-pointer flex items-center justify-center" title="Clear Chat">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                    </svg>
+                </button>
+            </div>
         </header>
 
         <!-- Scrollable Chat Messages Window -->
@@ -191,11 +198,29 @@
         const sendBtn = document.getElementById("send-btn");
         const statusText = document.getElementById("status-text");
         const modelSelect = document.getElementById("model-select");
+        const clearBtn = document.getElementById("clear-btn");
 
-        // Maintain conversation history
-        let chatHistory = [
+        // Default greeting message
+        const defaultHistory = [
             { role: "assistant", content: "Hello! How can I assist you with your questions today?" }
         ];
+
+        // Maintain conversation history - load from localStorage if exists
+        let chatHistory = JSON.parse(localStorage.getItem("ai_chat_history")) || [...defaultHistory];
+
+        // Save conversation history to localStorage
+        function saveChatHistory() {
+            localStorage.setItem("ai_chat_history", JSON.stringify(chatHistory));
+        }
+
+        // Render all messages in history
+        function renderAllMessages() {
+            chatBox.innerHTML = "";
+            chatHistory.forEach((msg) => {
+                const sender = msg.role === "assistant" ? "bot" : "user";
+                appendMessage(sender, msg.content);
+            });
+        }
 
         // Custom renderer configurations for Marked
         marked.setOptions({
@@ -231,9 +256,51 @@
                 // Safely parse Markdown for bot replies
                 bubble.innerHTML = marked.parse(text);
 
-                // Dynamically apply code highlighting
-                bubble.querySelectorAll("pre code").forEach((block) => {
-                    hljs.highlightElement(block);
+                // Dynamically apply code highlighting and copy buttons
+                bubble.querySelectorAll("pre").forEach((pre) => {
+                    const code = pre.querySelector("code");
+                    if (code) {
+                        hljs.highlightElement(code);
+                    }
+
+                    // Setup pre container styles for copy button layout
+                    pre.classList.add("relative", "group");
+
+                    // Create the glassmorphic Copy button
+                    const copyBtn = document.createElement("button");
+                    copyBtn.type = "button";
+                    copyBtn.className = "absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-slate-800/90 hover:bg-slate-700/90 border border-white/10 text-slate-300 hover:text-white px-2 py-1 rounded-md text-[10px] font-semibold flex items-center gap-1 cursor-pointer select-none z-10";
+                    
+                    const copyIcon = `
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.057 1.123-.08M15.75 18H18a2.25 2.25 0 002-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08M15.75 18.75v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5A3.375 3.375 0 006.375 7.5H5.25m11.9-3.664A2.251 2.251 0 0015 2.25h-1.5a2.251 2.251 0 00-2.15 1.586m5.8 0c.065.21.1.433.1.664v.75h-6V4.5c0-.231.035-.454.1-.664M6.75 7.5H4.875c-.621 0-1.125.504-1.125 1.125v12c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V16.5a9 9 0 00-9-9z" />
+                        </svg>
+                    `;
+                    const checkIcon = `
+                        <svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                    `;
+
+                    copyBtn.innerHTML = `${copyIcon}<span>Copy</span>`;
+                    pre.appendChild(copyBtn);
+
+                    // Add click event for copy functionality
+                    copyBtn.addEventListener("click", async () => {
+                        const textToCopy = code ? code.innerText : pre.innerText;
+                        try {
+                            await navigator.clipboard.writeText(textToCopy);
+                            copyBtn.innerHTML = `${checkIcon}<span class="text-emerald-400">Copied!</span>`;
+                            copyBtn.classList.add("border-emerald-500/30");
+                            
+                            setTimeout(() => {
+                                copyBtn.innerHTML = `${copyIcon}<span>Copy</span>`;
+                                copyBtn.classList.remove("border-emerald-500/30");
+                            }, 2000);
+                        } catch (err) {
+                            console.error("Failed to copy text: ", err);
+                        }
+                    });
                 });
 
                 wrapper.appendChild(bubble);
@@ -293,6 +360,7 @@
             // 1. Display user message immediately on UI
             appendMessage("user", prompt);
             chatHistory.push({ role: "user", content: prompt });
+            saveChatHistory();
             input.value = "";
             sendBtn.disabled = true;
             
@@ -319,6 +387,7 @@
                 if (response.ok && data.reply) {
                     appendMessage("bot", data.reply);
                     chatHistory.push({ role: "assistant", content: data.reply });
+                    saveChatHistory();
                 } else {
                     appendMessage("bot", `Error: ${data.error || "Unable to get response"}`);
                 }
@@ -331,6 +400,18 @@
                 input.focus();
             }
         });
+
+        // Bind clear chat button event listener
+        clearBtn.addEventListener("click", () => {
+            if (confirm("Are you sure you want to clear this conversation?")) {
+                chatHistory = [...defaultHistory];
+                saveChatHistory();
+                renderAllMessages();
+            }
+        });
+
+        // Run initial history render on page load
+        renderAllMessages();
     </script>
 </body>
 
