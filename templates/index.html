@@ -13,6 +13,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Load Marked JS for dynamic Markdown parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+    <!-- Load Highlight.js and a dark theme style -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
     <script>
         tailwind.config = {
@@ -99,7 +102,7 @@
             font-size: 0.875rem;
         }
         .prose-custom pre {
-            background: rgba(0, 0, 0, 0.4);
+            background: rgba(10, 15, 30, 0.7) !important;
             padding: 0.75rem;
             border-radius: 0.5rem;
             overflow-x: auto;
@@ -107,8 +110,8 @@
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
         .prose-custom pre code {
-            background: transparent;
-            padding: 0;
+            background: transparent !important;
+            padding: 0 !important;
             border-radius: 0;
         }
     </style>
@@ -189,6 +192,11 @@
         const statusText = document.getElementById("status-text");
         const modelSelect = document.getElementById("model-select");
 
+        // Maintain conversation history
+        let chatHistory = [
+            { role: "assistant", content: "Hello! How can I assist you with your questions today?" }
+        ];
+
         // Custom renderer configurations for Marked
         marked.setOptions({
             breaks: true,
@@ -222,6 +230,12 @@
                 bubble.className = "glass-panel px-4 py-3 rounded-2xl rounded-tl-sm text-sm text-slate-200 max-w-[80%] leading-relaxed shadow-sm prose-custom";
                 // Safely parse Markdown for bot replies
                 bubble.innerHTML = marked.parse(text);
+
+                // Dynamically apply code highlighting
+                bubble.querySelectorAll("pre code").forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+
                 wrapper.appendChild(bubble);
             }
 
@@ -278,6 +292,7 @@
 
             // 1. Display user message immediately on UI
             appendMessage("user", prompt);
+            chatHistory.push({ role: "user", content: prompt });
             input.value = "";
             sendBtn.disabled = true;
             
@@ -290,7 +305,7 @@
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ 
-                        prompt: prompt,
+                        messages: chatHistory,
                         model: modelSelect.value
                     })
                 });
@@ -303,6 +318,7 @@
                 // 4. Render the bot's response or error
                 if (response.ok && data.reply) {
                     appendMessage("bot", data.reply);
+                    chatHistory.push({ role: "assistant", content: data.reply });
                 } else {
                     appendMessage("bot", `Error: ${data.error || "Unable to get response"}`);
                 }

@@ -35,33 +35,31 @@ def ask():
     # Extract the JSON payload sent by the browser's fetch request
     data = request.get_json()
     
-    # Safely retrieve the 'prompt' value and strip whitespace
-    user_prompt = data.get("prompt", "").strip()
+    # Retrieve model, fallback to gpt-4o-mini
     selected_model = data.get("model", "gpt-4o-mini").strip()
     if not selected_model:
         selected_model = "gpt-4o-mini"
 
-    # Print log statement to verify selected model in terminal
-    print(f"\n[API REQUEST] Model: {selected_model} | Prompt: {user_prompt[:50]}...")
+    # Retrieve conversation history list
+    messages = data.get("messages", [])
 
-    # Guard clause: Return an HTTP 400 (Bad Request) if the input is empty
-    if not user_prompt:
-        return jsonify({"error": "Prompt cannot be empty."}), 400
+    # Guard clause: Return an HTTP 400 (Bad Request) if the history is empty
+    if not messages:
+        return jsonify({"error": "Conversation history cannot be empty."}), 400
 
     try:
-        # Send the prompt to the OpenAI Chat Completions API
+        # Prepend system prompt to the conversation thread
+        api_messages = [
+            {
+                "role": "system",
+                "content": "You are a helpful, concise AI assistant."
+            }
+        ] + messages
+
+        # Send the conversation thread to the OpenAI Chat Completions API
         response = client.chat.completions.create(
-            model=selected_model,  # Dynamically selected model
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a helpful, concise AI assistant."
-                },
-                {
-                    "role": "user",
-                    "content": user_prompt
-                }
-            ]
+            model=selected_model,
+            messages=api_messages
         )
 
         # Extract the text content from the API response object
