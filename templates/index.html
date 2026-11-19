@@ -13,6 +13,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Load Marked JS for dynamic Markdown parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+    <!-- Load DOMPurify to sanitize rendered Markdown (prevents XSS) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
     <!-- Load Highlight.js and a dark theme style -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -206,7 +208,12 @@
         ];
 
         // Maintain conversation history - load from localStorage if exists
-        let chatHistory = JSON.parse(localStorage.getItem("ai_chat_history")) || [...defaultHistory];
+        let chatHistory;
+        try {
+            chatHistory = JSON.parse(localStorage.getItem("ai_chat_history")) || [...defaultHistory];
+        } catch {
+            chatHistory = [...defaultHistory];
+        }
 
         // Save conversation history to localStorage
         function saveChatHistory() {
@@ -253,11 +260,27 @@
 
                 const bubble = document.createElement("div");
                 bubble.className = "glass-panel px-4 py-3 rounded-2xl rounded-tl-sm text-sm text-slate-200 max-w-[80%] leading-relaxed shadow-sm prose-custom";
-                // Safely parse Markdown for bot replies
-                bubble.innerHTML = marked.parse(text);
+                renderBotContent(bubble, text);
+                wrapper.appendChild(bubble);
+            }
 
-                // Dynamically apply code highlighting and copy buttons
-                bubble.querySelectorAll("pre").forEach((pre) => {
+            chatBox.appendChild(wrapper);
+            // Auto-scroll to the newest message
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return wrapper;
+        }
+
+        /**
+         * Render Markdown into a bot bubble: parse, sanitize, then (unless
+         * still streaming) add syntax highlighting and copy buttons.
+         */
+        function renderBotContent(bubble, text, streaming = false) {
+            // Sanitize before inserting - model output must never run as HTML/JS
+            bubble.innerHTML = DOMPurify.sanitize(marked.parse(text));
+            if (streaming) return;
+
+            // Dynamically apply code highlighting and copy buttons
+            bubble.querySelectorAll("pre").forEach((pre) => {
                     const code = pre.querySelector("code");
                     if (code) {
                         hljs.highlightElement(code);
@@ -302,13 +325,6 @@
                         }
                     });
                 });
-
-                wrapper.appendChild(bubble);
-            }
-
-            chatBox.appendChild(wrapper);
-            // Auto-scroll to the newest message
-            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         /**
@@ -378,19 +394,55 @@
                     })
                 });
 
-                const data = await response.json();
-                
-                // Hide dynamic typing bubble before rendering answer
+                // Validation/rate-limit errors come back as JSON with an error status
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    hideTypingIndicator();
+                    appendMessage("bot", `Error: ${data.error || "Unable to get response"}`);
+                    return;
+                }
+
+                // 4. Stream the reply: read text chunks and re-render as they arrive
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let reply = "";
+                let bubble = null;
+                let pending = false;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    reply += decoder.decode(value, { stream: true });
+
+                    // Swap the typing dots for a real bubble on the first chunk
+                    if (!bubble) {
+                        hideTypingIndicator();
+                        statusText.textContent = "Responding...";
+                        bubble = appendMessage("bot", "").querySelector(".prose-custom");
+                    }
+                    // Re-render at most once per animation frame
+                    if (!pending) {
+                        pending = true;
+                        requestAnimationFrame(() => {
+                            renderBotContent(bubble, reply, true);
+                            chatBox.scrollTop = chatBox.scrollHeight;
+                            pending = false;
+                        });
+                    }
+                }
+                reply += decoder.decode();
                 hideTypingIndicator();
 
-                // 4. Render the bot's response or error
-                if (response.ok && data.reply) {
-                    appendMessage("bot", data.reply);
-                    chatHistory.push({ role: "assistant", content: data.reply });
-                    saveChatHistory();
-                } else {
-                    appendMessage("bot", `Error: ${data.error || "Unable to get response"}`);
+                if (!reply.trim()) {
+                    appendMessage("bot", "Error: Empty response from the model.");
+                    return;
                 }
+                // Final render with syntax highlighting + copy buttons
+                await new Promise(requestAnimationFrame);
+                renderBotContent(bubble, reply);
+                chatBox.scrollTop = chatBox.scrollHeight;
+                chatHistory.push({ role: "assistant", content: reply });
+                saveChatHistory();
             } catch (err) {
                 hideTypingIndicator();
                 appendMessage("bot", "Network error: Could not reach the server.");
@@ -415,4 +467,4 @@
     </script>
 </body>
 
-</html>
+</html>
